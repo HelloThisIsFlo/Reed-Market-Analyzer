@@ -1,5 +1,5 @@
-import sum from "./sandbox";
+import { debugJestSum } from "./sandbox";
 
 test("yo", () => {
-  expect(sum(1, 4)).toBe(5);
+  expect(debugJestSum(1, 4)).toBe(5);
 });
