@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 import axios from "axios";
+const AXIOS_DEBUG = false;
 import hash from "object-hash";
 import { dirname } from "path";
 import fs from "fs";
@@ -75,7 +76,9 @@ class ReedApi {
     });
 
     this.axiosReedApi.interceptors.request.use(request => {
-      console.log("Starting Request", request.url);
+      if (AXIOS_DEBUG) {
+        console.log("Starting Request", request.url);
+      }
       return request;
     });
   }
