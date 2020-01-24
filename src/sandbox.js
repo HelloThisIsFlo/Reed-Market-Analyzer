@@ -4,6 +4,7 @@ import axios from "axios";
 import hash from "object-hash";
 import { dirname } from "path";
 import fs from "fs";
+import _ from "lodash";
 
 import querystring from "querystring";
 
@@ -157,24 +158,58 @@ class ReedApi {
 }
 
 async function main() {
+  const cache = new Cache();
+  const reedApi = new ReedApi(cache);
+
   const demoApi = async () => {
-    const cache = new Cache();
-    const reedApi = new ReedApi(cache);
     const results = await reedApi.search({ keywords: "python" });
     console.log("results.length", results.length);
-
-    const detailRes = await reedApi.details(39680634);
-    console.log(detailRes);
-
     const jobDetails = await reedApi.detailsForAll(results);
-    console.log(jobDetails.length);
-    console.log(jobDetails[99]);
   };
   const demoCache = async () => {
     const cache = new Cache();
     console.log(cache.has({ this: "is", a: 4, test: true }));
   };
-  await demoApi();
+
+  const numOfContracts = async ({
+    keywords,
+    matchingKeywordsInDescription = [],
+    nonMatchingKeywordsInDescription = []
+  }) => {
+    const lowerCase = wordList => wordList.map(word => word.toLowerCase());
+    matchingKeywordsInDescription = lowerCase(matchingKeywordsInDescription);
+    nonMatchingKeywordsInDescription = lowerCase(
+      nonMatchingKeywordsInDescription
+    );
+    const descriptionFilter = jobDetail => {
+      const description = jobDetail.jobDescription.toLowerCase();
+      let isMatching = true;
+      for (let expectedKeyword of matchingKeywordsInDescription) {
+        if (!description.includes(expectedKeyword)) {
+          isMatching = false;
+        }
+      }
+      for (let unexpectedKeyword of nonMatchingKeywordsInDescription) {
+        if (description.includes(unexpectedKeyword)) {
+          isMatching = false;
+        }
+      }
+      return isMatching;
+    };
+
+    const jobDetails = await reedApi.detailsForAll(
+      await reedApi.search({ keywords })
+    );
+
+    return jobDetails.filter(descriptionFilter).length;
+  };
+
+  const hey = await numOfContracts({
+    keywords: "python",
+    matchingKeywordsInDescription: ["tdd"],
+    nonMatchingKeywordsInDescription: ["java"]
+  });
+  console.log(hey);
 }
 
 main().catch(e => console.log(e));
