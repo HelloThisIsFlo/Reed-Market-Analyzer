@@ -157,25 +157,16 @@ class ReedApi {
   }
 }
 
-async function main() {
-  const cache = new Cache();
-  const reedApi = new ReedApi(cache);
+class MarketCrawler {
+  constructor(reedApi) {
+    this.reedApi = reedApi;
+  }
 
-  const demoApi = async () => {
-    const results = await reedApi.search({ keywords: "python" });
-    console.log("results.length", results.length);
-    const jobDetails = await reedApi.detailsForAll(results);
-  };
-  const demoCache = async () => {
-    const cache = new Cache();
-    console.log(cache.has({ this: "is", a: 4, test: true }));
-  };
-
-  const numOfContracts = async ({
+  async contractsMatching({
     keywords,
     matchingKeywordsInDescription = [],
     nonMatchingKeywordsInDescription = []
-  }) => {
+  }) {
     const lowerCase = wordList => wordList.map(word => word.toLowerCase());
     matchingKeywordsInDescription = lowerCase(matchingKeywordsInDescription);
     nonMatchingKeywordsInDescription = lowerCase(
@@ -197,19 +188,53 @@ async function main() {
       return isMatching;
     };
 
-    const jobDetails = await reedApi.detailsForAll(
-      await reedApi.search({ keywords })
+    const jobDetails = await this.reedApi.detailsForAll(
+      await this.reedApi.search({ keywords })
     );
 
-    return jobDetails.filter(descriptionFilter).length;
-  };
+    return jobDetails.filter(descriptionFilter);
+  }
 
-  const hey = await numOfContracts({
-    keywords: "python",
-    matchingKeywordsInDescription: ["tdd"],
-    nonMatchingKeywordsInDescription: ["java"]
-  });
-  console.log(hey);
+  async logNumOfContracts(
+    {
+      keywords,
+      matchingKeywordsInDescription = [],
+      nonMatchingKeywordsInDescription = []
+    },
+    logUrls = false
+  ) {
+    const matching = await this.contractsMatching({
+      keywords,
+      matchingKeywordsInDescription,
+      nonMatchingKeywordsInDescription
+    });
+
+    console.log(
+      `K: '${keywords}' ` +
+        `M: '${matchingKeywordsInDescription.join(" ")}' ` +
+        `nM: '${nonMatchingKeywordsInDescription.join(" ")}' ` +
+        `==> ${matching.length}`
+    );
+    if (logUrls)
+      matching.map(contract => contract.jobUrl).forEach(id => console.log(id));
+
+    console.log("");
+  }
+}
+
+async function main() {
+  const cache = new Cache();
+  const reedApi = new ReedApi(cache);
+  const marketCrawler = new MarketCrawler(reedApi);
+
+  await marketCrawler.logNumOfContracts(
+    {
+      keywords: "python",
+      matchingKeywordsInDescription: ["tdd", "django"],
+      nonMatchingKeywordsInDescription: ["machine"]
+    },
+    true
+  );
 }
 
 main().catch(e => console.log(e));
