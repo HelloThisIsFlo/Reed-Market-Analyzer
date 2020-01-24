@@ -1,8 +1,4 @@
-import { debugJestSum, removeAllNulls } from "./sandbox";
-
-test("yo", () => {
-  expect(debugJestSum(1, 4)).toBe(5);
-});
+import { removeAllNulls } from "./sandbox";
 
 test("removeAllNulls", () => {
   expect(

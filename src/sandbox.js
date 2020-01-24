@@ -4,23 +4,6 @@ import axios from "axios";
 
 import querystring from "querystring";
 
-export function debugJestSum(a, b) {
-  return a + b;
-}
-
-/*
-search?keywords={keywords}&loc ationName={locationName}&employerId={employerId}&distanceFromLocation={distance in miles}
-*/
-
-// reedApi
-//   .get("/search", querystring.stringify({ keywords: "python" }))
-//   // .get(
-//   //   "/search?keywords=accountant&location=london&employerid=123&distancefromlocation=15"
-//   // )
-//   .then(resp => console.log(resp.data))
-//   .catch(error => console.log(error));
-// console.log(process.env.YO);
-
 export const removeAllNulls = obj => {
   return Object.keys(obj)
     .filter(key => obj[key] !== null)
@@ -42,6 +25,11 @@ class ReedApi {
         password: ""
       }
     });
+
+    this.axiosReedApi.interceptors.request.use(request => {
+      console.log("Starting Request", request.url);
+      return request;
+    });
   }
 
   async search({
@@ -56,11 +44,9 @@ class ReedApi {
     minimumSalary = null,
     maximumSalary = null,
     postedByRecruitmentAgency = null,
-    postedByDirectEmployer = null,
-    resultsToTake = 100,
-    resultsToSkip = 0
+    postedByDirectEmployer = null
   }) {
-    const params = removeAllNulls({
+    const searchParams = removeAllNulls({
       keywords,
       locationName,
       distanceFromLocation,
@@ -72,50 +58,60 @@ class ReedApi {
       minimumSalary,
       maximumSalary,
       postedByRecruitmentAgency,
-      postedByDirectEmployer,
-      resultsToTake,
-      resultsToSkip
+      postedByDirectEmployer
     });
-    const resp = await this.axiosReedApi.get(
-      `/search?${querystring.stringify(params)}`
-    );
-    const searchRes = resp.data;
+    const fetchPage = async alreadyFetched => {
+      const resultsToTake = 100;
+      const resp = await this.axiosReedApi.get(
+        `/search?${querystring.stringify({
+          ...searchParams,
+          resultsToTake,
+          resultsToSkip: alreadyFetched
+        })}`
+      );
+      const { results, totalResults } = resp.data;
+      return { results, totalResults };
+    };
 
-    if (searchRes.totalResults >= 500)
-      throw new Error("Too many results (>= 500)");
+    let alreadyFetched = 0;
+    let allResults = [];
 
-    return searchRes;
+    let page = await fetchPage(alreadyFetched);
+    if (page.totalResults >= 500) throw new Error("Too many results (>= 500)");
+    alreadyFetched += page.results.length;
+    allResults = [...allResults, ...page.results];
+    while (alreadyFetched < page.totalResults) {
+      page = await fetchPage(alreadyFetched);
+      alreadyFetched += page.results.length;
+      allResults = [...allResults, ...page.results];
+    }
+
+    return allResults;
   }
 
   async details(jobId) {
     const resp = await this.axiosReedApi.get(`/jobs/${jobId}`);
     return resp.data;
   }
+
+  async detailsForAll(searchResults) {
+    return await Promise.all(
+      searchResults.map(res => res.jobId).map(this.details.bind(this))
+    );
+  }
 }
 
 async function main() {
   const reedApi = new ReedApi();
-  const searchRes = await reedApi.search({ keywords: "python" });
-  const results = searchRes.results;
-
-  const jobDetails = await Promise.all(
-    results.map(res => reedApi.details(res.jobId))
-  );
-
-  console.log(Object.keys(searchRes));
-  console.log(searchRes.totalResults);
-  console.log(searchRes.results.length);
-  console.log(searchRes.results[99]);
+  const results = await reedApi.search({ keywords: "python" });
+  console.log("results.length", results.length);
 
   const detailRes = await reedApi.details(39680634);
   console.log(detailRes);
 
-  const yo = searchRes.results[3];
-  const yoDetails = jobDetails[3];
-
+  const jobDetails = await reedApi.detailsForAll(results);
   console.log(jobDetails.length);
   console.log(jobDetails[99]);
 }
 
 main().catch(e => console.log(e));
-// const axios = axios
