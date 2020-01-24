@@ -225,19 +225,56 @@ class MarketCrawler {
   }
 }
 
+const QueryFactory = marketCrawler => keywords => {
+  let matchingKeywordsInDescription = [];
+  let nonMatchingKeywordsInDescription = [];
+
+  return {
+    withTdd() {
+      matchingKeywordsInDescription.push("tdd");
+      return this;
+    },
+
+    withNoAI() {
+      nonMatchingKeywordsInDescription.push("ai");
+      nonMatchingKeywordsInDescription.push("machine");
+      return this;
+    },
+
+    async run() {
+      await marketCrawler.logNumOfContracts({
+        keywords,
+        matchingKeywordsInDescription,
+        nonMatchingKeywordsInDescription
+      });
+    }
+  };
+};
+
 async function main() {
   const cache = new Cache();
   const reedApi = new ReedApi(cache);
   const marketCrawler = new MarketCrawler(reedApi);
+  const newQuery = QueryFactory(marketCrawler);
 
-  await marketCrawler.logNumOfContracts(
-    {
-      keywords: "python",
-      matchingKeywordsInDescription: ["tdd", "django"],
-      nonMatchingKeywordsInDescription: ["machine"]
-    },
-    true
-  );
+  await newQuery("react")
+    .withTdd()
+    .run();
+  await newQuery("python")
+    .withTdd()
+    .withNoAI()
+    .run();
+  await newQuery("python")
+    .withNoAI()
+    .run();
+  await newQuery("java")
+    .withTdd()
+    .withNoAI()
+    .run();
+  await newQuery("java")
+    .withNoAI()
+    .run();
+  await newQuery("elixir").run();
 }
 
 main().catch(e => console.log(e));
