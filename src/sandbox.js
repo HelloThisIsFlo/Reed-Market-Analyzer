@@ -8,6 +8,7 @@ import fs from "fs";
 import _ from "lodash";
 
 import querystring from "querystring";
+import TimeDifference from "./timeDifference";
 
 export const removeAllNulls = obj => {
   return Object.keys(obj)
@@ -38,7 +39,7 @@ class Cache {
   constructor() {
     this.path = dirname(dirname(require.main.filename)) + "/.cache";
     if (!fs.existsSync(this.path)) {
-      fs.mkdirSync(this.path)
+      fs.mkdirSync(this.path);
     }
   }
 
@@ -200,11 +201,27 @@ class MarketCrawler {
       return isMatching;
     };
 
+    const addDaysAgoInfo = jobDetail => {
+      const parseDate = dateString => {
+        const [day, month, year] = dateString.split("/");
+        return new Date(year, month - 1, day);
+      };
+      const datePosted = parseDate(jobDetail.datePosted);
+      const diff = new TimeDifference(datePosted);
+      return { ...jobDetail, daysAgo: diff.daysAgo };
+    };
+
     const jobDetails = await this.reedApi.detailsForAll(
       await this.reedApi.search({ keywords })
     );
+    const sortByAge = (a, b) => a.daysAgo - b.daysAgo;
 
-    return jobDetails.filter(descriptionFilter);
+    const jobDetailsMatching = jobDetails
+      .filter(descriptionFilter)
+      .map(addDaysAgoInfo);
+    jobDetailsMatching.sort(sortByAge);
+
+    return jobDetailsMatching;
   }
 
   async logNumOfContracts(
@@ -228,7 +245,11 @@ class MarketCrawler {
         `==> ${matching.length}`
     );
     if (logUrls)
-      matching.map(contract => contract.jobUrl).forEach(id => console.log(id));
+      matching
+        .map(contract => ({ url: contract.jobUrl, daysAgo: contract.daysAgo }))
+        .forEach(({ url, daysAgo }) =>
+          console.log(`${url} - ${daysAgo} Days ago`)
+        );
 
     console.log("");
   }
@@ -251,11 +272,14 @@ const QueryFactory = marketCrawler => keywords => {
     },
 
     async run() {
-      await marketCrawler.logNumOfContracts({
-        keywords,
-        matchingKeywordsInDescription,
-        nonMatchingKeywordsInDescription
-      });
+      await marketCrawler.logNumOfContracts(
+        {
+          keywords,
+          matchingKeywordsInDescription,
+          nonMatchingKeywordsInDescription
+        },
+        true
+      );
     }
   };
 };
