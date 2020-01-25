@@ -37,6 +37,9 @@ const loadData = filename => {
 class Cache {
   constructor() {
     this.path = dirname(dirname(require.main.filename)) + "/.cache";
+    if (!fs.existsSync(this.path)) {
+      fs.mkdirSync(this.path)
+    }
   }
 
   has(params) {
@@ -64,6 +67,12 @@ class Cache {
 class ReedApi {
   constructor(cache) {
     const reedApiKey = process.env.REED_API_KEY;
+    if (process.env.REED_API_KEY === undefined) {
+      throw new Error(
+        "Do not forget to set 'REED_API_KEY' in a '.env' " +
+          "file at the root of the project"
+      );
+    }
     const reedApiVersion = "1.0";
 
     this.cache = cache;
