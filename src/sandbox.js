@@ -178,7 +178,8 @@ class MarketCrawler {
   async contractsMatching({
     keywords,
     matchingKeywordsInDescription = [],
-    nonMatchingKeywordsInDescription = []
+    nonMatchingKeywordsInDescription = [],
+    maxAgeInDays
   }) {
     const lowerCase = wordList => wordList.map(word => word.toLowerCase());
     matchingKeywordsInDescription = lowerCase(matchingKeywordsInDescription);
@@ -201,6 +202,8 @@ class MarketCrawler {
       return isMatching;
     };
 
+    const ageFilter = jobDetail => jobDetail.daysAgo <= maxAgeInDays;
+
     const addDaysAgoInfo = jobDetail => {
       const parseDate = dateString => {
         const [day, month, year] = dateString.split("/");
@@ -218,7 +221,8 @@ class MarketCrawler {
 
     const jobDetailsMatching = jobDetails
       .filter(descriptionFilter)
-      .map(addDaysAgoInfo);
+      .map(addDaysAgoInfo)
+      .filter(ageFilter);
     jobDetailsMatching.sort(sortByAge);
 
     return jobDetailsMatching;
@@ -228,20 +232,23 @@ class MarketCrawler {
     {
       keywords,
       matchingKeywordsInDescription = [],
-      nonMatchingKeywordsInDescription = []
+      nonMatchingKeywordsInDescription = [],
+      maxAgeInDays
     },
     logUrls = false
   ) {
     const matching = await this.contractsMatching({
       keywords,
       matchingKeywordsInDescription,
-      nonMatchingKeywordsInDescription
+      nonMatchingKeywordsInDescription,
+      maxAgeInDays
     });
 
     console.log(
       `K: '${keywords}' ` +
         `M: '${matchingKeywordsInDescription.join(" ")}' ` +
         `nM: '${nonMatchingKeywordsInDescription.join(" ")}' ` +
+        `D: ${maxAgeInDays} ` +
         `==> ${matching.length}`
     );
     if (logUrls)
@@ -258,6 +265,7 @@ class MarketCrawler {
 const QueryFactory = marketCrawler => keywords => {
   let matchingKeywordsInDescription = [];
   let nonMatchingKeywordsInDescription = [];
+  let maxAgeInDays = 40;
 
   return {
     withTdd() {
@@ -271,14 +279,20 @@ const QueryFactory = marketCrawler => keywords => {
       return this;
     },
 
-    async run() {
+    postedAtMost({ daysAgo }) {
+      maxAgeInDays = daysAgo;
+      return this;
+    },
+
+    async run({ logLinks = false } = {}) {
       await marketCrawler.logNumOfContracts(
         {
           keywords,
           matchingKeywordsInDescription,
-          nonMatchingKeywordsInDescription
+          nonMatchingKeywordsInDescription,
+          maxAgeInDays
         },
-        true
+        logLinks
       );
     }
   };
@@ -299,6 +313,14 @@ async function main() {
     .run();
   await newQuery("python")
     .withNoAI()
+    .postedAtMost({ daysAgo: 3 })
+    .run();
+  await newQuery("python")
+    .withNoAI()
+    .postedAtMost({ daysAgo: 7 })
+    .run();
+  await newQuery("python")
+    .withNoAI()
     .run();
   await newQuery("java")
     .withTdd()
@@ -308,6 +330,27 @@ async function main() {
     .withNoAI()
     .run();
   await newQuery("elixir").run();
+
+  await newQuery("python")
+    .withTdd()
+    .postedAtMost({daysAgo: 3})
+    .run({ logLinks: true });
+
+  await newQuery("python")
+    // .withTdd()
+    .postedAtMost({daysAgo: 3})
+    .run({ logLinks: true });
+
+
+  await newQuery("react")
+    // .withTdd()
+    .postedAtMost({daysAgo: 3})
+    .run({ logLinks: true });
+
+  await newQuery("java")
+    .withTdd()
+    .postedAtMost({daysAgo: 3})
+    .run({ logLinks: true });
 }
 
 main().catch(e => console.log(e));
